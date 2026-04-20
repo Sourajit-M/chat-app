@@ -5,7 +5,9 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import { createServer } from "http";
 import { env } from "./config/env";
+import "./config/redis";
 import { prisma } from "./config/prisma";
+import authRoutes from "./auth/auth.routes"
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,7 +29,7 @@ app.get("/health", (_req, res) => {
 });
 
 // TODO: Routes will be added in Phase 2+
-// app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 // app.use("/api/conversations", conversationRoutes);
 // app.use("/api/messages", messageRoutes);
 // app.use("/api/ai", aiRoutes);
@@ -50,3 +52,5 @@ const start = async () => {
 };
 
 start();
+
+//httpServer is there because the Express app is only the request handler. Wrapping it with createServer(app) gives you the underlying Node HTTP server, which is needed if you want to attach socket.io, handle WebSockets, or manage server-level events like graceful shutdown later.
