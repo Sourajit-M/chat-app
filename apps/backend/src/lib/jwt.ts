@@ -8,8 +8,8 @@ export const generateTokenAndSetCookie = (res: Response, payload: object) => {
   res.cookie('token', token, {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
-    sameSite: 'strict',
-    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    secure: false,
   });
 
   return token;
