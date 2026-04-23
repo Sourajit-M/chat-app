@@ -7,6 +7,8 @@ import Navbar from "./components/ui/Navbar";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ProfilePage from "./pages/ProfilePage";
+import SettingsPage from "./pages/SettingsPage";
 import { Loader2 } from "lucide-react";
 
 function App(){
@@ -34,6 +36,8 @@ function App(){
           <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" />} />
           <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" />} />
           <Route path="/signup" element={!authUser ? <SignupPage /> : <Navigate to="/" />} />
+          <Route path="/profile" element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
       <Toaster />
