@@ -1,6 +1,11 @@
 import type { User } from "./user";
 import type { Message } from "./message";
 
+export interface ConversationParticipant {
+  user: Pick<User, "id" | "fullName" | "email" | "profilePic">;
+  joinedAt: string;
+}
+
 export interface Conversation {
   id: string;
   name: string | null;

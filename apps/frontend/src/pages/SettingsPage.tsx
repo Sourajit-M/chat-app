@@ -1,14 +1,6 @@
 import { useThemeStore } from "../store/useThemeStore";
 import { MessageSquare } from "lucide-react";
-
-const THEMES = [
-  "light", "dark", "cupcake", "bumblebee", "emerald",
-  "corporate", "synthwave", "retro", "cyberpunk",
-  "valentine", "halloween", "garden", "forest",
-  "aqua", "lofi", "pastel", "fantasy", "wireframe",
-  "black", "luxury", "dracula", "cmyk", "autumn",
-  "business", "acid", "lemonade", "night", "coffee", "winter",
-];
+import { THEMES } from "../constants/themes";
 
 const PREVIEW_MESSAGES = [
   { id: 1, content: "Hey! How's it going?", isSent: false },

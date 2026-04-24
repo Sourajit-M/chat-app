@@ -19,6 +19,11 @@ function App(){
     checkAuth()
   },[checkAuth])
 
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
+  }, [theme]);
+
   if(isCheckingAuth){
     return (
       <div className="flex items-center justify-center h-screen">
@@ -29,7 +34,7 @@ function App(){
 
 
   return (
-    <div data-theme={theme}>
+    <div className="min-h-screen bg-base-100 text-base-content">
       <Navbar />
       <div className="pt-16">
         <Routes>

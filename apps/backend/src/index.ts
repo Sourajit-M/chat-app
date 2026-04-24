@@ -8,6 +8,7 @@ import { env } from "./config/env";
 import "./config/redis";
 import { prisma } from "./config/prisma";
 import authRoutes from "./auth/auth.routes"
+import conversationRoutes from "./conversations/conversations.routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -30,7 +31,7 @@ app.get("/health", (_req, res) => {
 
 // TODO: Routes will be added in Phase 2+
 app.use("/api/auth", authRoutes);
-// app.use("/api/conversations", conversationRoutes);
+app.use("/api/conversations", conversationRoutes);
 // app.use("/api/messages", messageRoutes);
 // app.use("/api/ai", aiRoutes);
 
