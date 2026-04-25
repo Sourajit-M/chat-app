@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
+import { getSocket } from "../lib/socket";
 import toast from "react-hot-toast";
 import type { Conversation, Message } from "@chat-app/shared";
 
@@ -18,6 +19,7 @@ interface ChatState {
   isLoadingConversations: boolean;
   isLoadingMessages: boolean;
   isLoadingUsers: boolean;
+  typingUserIds: string[];
 
   getConversations: () => Promise<void>;
   getUsers: () => Promise<void>;
@@ -27,6 +29,10 @@ interface ChatState {
   addGroupMember: (conversationId: string, userId: string) => Promise<void>;
   removeGroupMember: (conversationId: string, userId: string) => Promise<void>;
   updateGroup: (conversationId: string, name: string) => Promise<void>;
+  getMessages: (conversationId: string) => Promise<void>;
+  sendMessage: (conversationId: string, data: { text?: string; image?: string }) => Promise<void>;
+  subscribeToMessages: () => void;
+  unsubscribeFromMessages: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -37,6 +43,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoadingConversations: false,
   isLoadingMessages: false,
   isLoadingUsers: false,
+  typingUserIds: [],
 
   getConversations: async () => {
     set({ isLoadingConversations: true });
@@ -63,21 +70,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectConversation: (conversation) => {
-    set({ selectedConversation: conversation, messages: [] });
+    set({ selectedConversation: conversation, messages: [], typingUserIds: [] });
   },
 
   getOrCreateDM: async (userId) => {
     try {
       const res = await axiosInstance.post(`/conversations/dm/${userId}`);
       const conversation = res.data;
-
-      // Add to list if not already there
       const exists = get().conversations.find((c) => c.id === conversation.id);
       if (!exists) {
         set((state) => ({ conversations: [conversation, ...state.conversations] }));
       }
-
-      set({ selectedConversation: conversation, messages: [] });
+      set({ selectedConversation: conversation, messages: [], typingUserIds: [] });
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to open DM");
     }
@@ -157,5 +161,84 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to update group");
     }
+  },
+
+  getMessages: async (conversationId) => {
+    set({ isLoadingMessages: true });
+    try {
+      const res = await axiosInstance.get(`/messages/${conversationId}`);
+      set({ messages: res.data });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to load messages");
+    } finally {
+      set({ isLoadingMessages: false });
+    }
+  },
+
+  sendMessage: async (conversationId, data) => {
+    try {
+      await axiosInstance.post(`/messages/${conversationId}`, data);
+      // No need to push to messages here — socket event handles it
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to send message");
+    }
+  },
+
+  subscribeToMessages: () => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const { selectedConversation } = get();
+    if (!selectedConversation) return;
+
+    // Join the conversation room
+    socket.emit("joinConversation", selectedConversation.id);
+
+    // Listen for new messages
+    socket.on("newMessage", (message: Message) => {
+      // Only add if it belongs to current conversation
+      if (message.conversationId !== get().selectedConversation?.id) return;
+      set((state) => ({ messages: [...state.messages, message] }));
+
+      // Bubble conversation to top of sidebar
+      set((state) => ({
+        conversations: state.conversations
+          .map((c) =>
+            c.id === message.conversationId
+              ? { ...c, messages: [message], updatedAt: message.createdAt }
+              : c
+          )
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+      }));
+    });
+
+    // Typing indicators
+    socket.on("userTyping", ({ userId }: { userId: string }) => {
+      set((state) => ({
+        typingUserIds: state.typingUserIds.includes(userId)
+          ? state.typingUserIds
+          : [...state.typingUserIds, userId],
+      }));
+    });
+
+    socket.on("userStopTyping", ({ userId }: { userId: string }) => {
+      set((state) => ({
+        typingUserIds: state.typingUserIds.filter((id) => id !== userId),
+      }));
+    });
+  },
+
+  unsubscribeFromMessages: () => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const { selectedConversation } = get();
+    if (selectedConversation) {
+      socket.emit("leaveConversation", selectedConversation.id);
+    }
+
+    socket.off("newMessage");
+    socket.off("userTyping");
+    socket.off("userStopTyping");
   },
 }));
