@@ -1,73 +1,109 @@
-# React + TypeScript + Vite
+# ChatApp 💬
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack real-time chat application built with modern technologies.
 
-Currently, two official plugins are available:
+## ✨ Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 🔐 JWT authentication with HttpOnly cookies
+- 💬 Real-time messaging with Socket.io
+- 👥 Group chats with admin controls
+- 🟢 Online presence indicators
+- ⌨️ Typing indicators
+- ✓✓ Read receipts
+- 🤖 AI-powered conversation summarization (Gemini)
+- 🖼️ Image sharing via Cloudinary
+- 🎨 30+ themes via daisyUI
+- 📱 Responsive design
 
-## React Compiler
+## 🛠️ Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend
+- Node.js + Express + TypeScript
+- PostgreSQL + Prisma ORM
+- Socket.io + Redis adapter
+- Zod validation
+- JWT + bcrypt
 
-## Expanding the ESLint configuration
+### Frontend
+- React 18 + Vite + TypeScript
+- Zustand state management
+- Tailwind CSS v4 + daisyUI v5
+- Socket.io client
+- Axios
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Infrastructure
+- Docker Compose (PostgreSQL + Redis)
+- pnpm monorepo with shared types
+- GitHub Actions CI
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🚀 Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Prerequisites
+- Node.js v20+
+- pnpm
+- Docker Desktop
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Clone and install
+```bash
+git clone https://github.com/yourusername/chat-app.git
+cd chat-app
+pnpm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Set up environment variables
+```bash
+cp apps/backend/.env.example apps/backend/.env
+# Fill in your values in apps/backend/.env
 ```
+
+### 3. Start Docker services
+```bash
+docker-compose up -d
+```
+
+### 4. Run database migrations
+```bash
+cd apps/backend
+pnpm db:migrate
+pnpm db:generate
+```
+
+### 5. Start development servers
+```bash
+# Terminal 1 — Backend
+cd apps/backend && pnpm dev
+
+# Terminal 2 — Frontend
+cd apps/frontend && pnpm dev
+```
+
+Visit `http://localhost:5173`
+
+## 🔑 Environment Variables
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_SECRET` | Secret for signing JWT tokens |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `CLIENT_URL` | Frontend URL for CORS |
+
+## 📁 Project Structure
+
+```
+chat-app/
+├── apps/
+│   ├── backend/          ← Express API + Socket.io
+│   └── frontend/         ← React + Vite
+├── packages/
+│   └── shared/           ← Shared TypeScript types
+├── docker-compose.yml
+└── .github/workflows/    ← CI pipeline
+```
+
+## 📜 License
+MIT
