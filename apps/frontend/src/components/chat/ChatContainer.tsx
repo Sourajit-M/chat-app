@@ -5,7 +5,8 @@ import { useConversationInfo } from "../../hooks/useConversationName";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 import GroupInfoPanel from "./GroupInfoPanel";
-import { Loader2, Users, X, Info } from "lucide-react";
+import SummaryModal from "./SummaryModal";
+import { Loader2, Users, X, Info, Sparkles } from "lucide-react";
 
 interface Props {
   onlineUserIds: string[];
@@ -26,6 +27,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
   const { authUser } = useAuthStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   const { name, avatar, isGroup, otherUser } =
     useConversationInfo(selectedConversation!);
@@ -98,8 +100,16 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
             </div>
           </div>
 
+          {/* ← Header right buttons — properly closed */}
           <div className="flex items-center gap-1">
-            {/* Group info toggle */}
+            <button
+              onClick={() => setShowSummary(true)}
+              className="btn btn-ghost btn-sm btn-circle"
+              title="AI Summary"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+
             {isGroup && (
               <button
                 onClick={() => setShowGroupInfo(!showGroupInfo)}
@@ -111,7 +121,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
                 <Info className="w-4 h-4" />
               </button>
             )}
-            {/* Close chat */}
+
             <button
               onClick={() => selectConversation(null as any)}
               className="btn btn-ghost btn-sm btn-circle"
@@ -119,7 +129,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
               <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        </div> {/* ← End of Header */}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-base-200">
@@ -154,11 +164,12 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
           )}
 
           <div ref={messagesEndRef} />
-        </div>
+        </div> {/* ← End of Messages */}
 
         {/* Input */}
         <MessageInput />
-      </div>
+
+      </div> {/* ← End of Main Chat Area */}
 
       {/* Group Info Side Panel */}
       {isGroup && showGroupInfo && selectedConversation && (
@@ -169,7 +180,16 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
         />
       )}
 
-    </div>
+      {/* Summary Modal */}
+      {showSummary && selectedConversation && (
+        <SummaryModal
+          conversationId={selectedConversation.id}
+          conversationName={name}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
+
+    </div> // ← End of root flex container
   );
 };
 

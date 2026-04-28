@@ -11,6 +11,7 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   CLIENT_URL: z.string().min(1),
 });
 
