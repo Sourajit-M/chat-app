@@ -11,6 +11,7 @@ import authRoutes from "./auth/auth.routes"
 import conversationRoutes from "./conversations/conversations.routes";
 import messageRoutes from "./messages/messages.routes"
 import { initSocket } from "./socket/socket.server";
+import aiRoutes from "./ai/ai.routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -34,7 +35,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
-// app.use("/api/ai", aiRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Start server
 const PORT = parseInt(env.PORT);
