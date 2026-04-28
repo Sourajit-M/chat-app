@@ -90,11 +90,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createGroup: async (data) => {
     try {
       const res = await axiosInstance.post("/conversations/group", data);
-      set((state) => ({
-        conversations: [res.data, ...state.conversations],
-        selectedConversation: res.data,
-        messages: [],
-      }));
+      set((state) => {
+        const exists = state.conversations.find((c) => c.id === res.data.id);
+        return {
+          conversations: exists ? state.conversations : [res.data, ...state.conversations],
+          selectedConversation: res.data,
+          messages: [],
+        };
+      });
       toast.success("Group created!");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to create group");
@@ -185,60 +188,93 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   subscribeToMessages: () => {
-    const socket = getSocket();
-    if (!socket) return;
+  const socket = getSocket();
+  if (!socket) return;
 
-    const { selectedConversation } = get();
-    if (!selectedConversation) return;
+  const { selectedConversation } = get();
+  if (!selectedConversation) return;
 
-    // Join the conversation room
-    socket.emit("joinConversation", selectedConversation.id);
+  socket.emit("joinConversation", selectedConversation.id);
 
-    // Listen for new messages
-    socket.on("newMessage", (message: Message) => {
-      // Only add if it belongs to current conversation
-      if (message.conversationId !== get().selectedConversation?.id) return;
-      set((state) => ({ messages: [...state.messages, message] }));
+  socket.on("newMessage", (message: Message) => {
+    if (message.conversationId !== get().selectedConversation?.id) return;
+    set((state) => ({ messages: [...state.messages, message] }));
+    set((state) => ({
+      conversations: state.conversations
+        .map((c) =>
+          c.id === message.conversationId
+            ? { ...c, messages: [message], updatedAt: message.createdAt }
+            : c
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        ),
+    }));
+  });
 
-      // Bubble conversation to top of sidebar
-      set((state) => ({
-        conversations: state.conversations
-          .map((c) =>
-            c.id === message.conversationId
-              ? { ...c, messages: [message], updatedAt: message.createdAt }
-              : c
-          )
-          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-      }));
+  socket.on("userTyping", ({ userId }: { userId: string }) => {
+    set((state) => ({
+      typingUserIds: state.typingUserIds.includes(userId)
+        ? state.typingUserIds
+        : [...state.typingUserIds, userId],
+    }));
+  });
+
+  socket.on("userStopTyping", ({ userId }: { userId: string }) => {
+    set((state) => ({
+      typingUserIds: state.typingUserIds.filter((id) => id !== userId),
+    }));
+  });
+
+  // Group updated (name change, member added)
+  socket.on("groupUpdated", (updatedConversation: Conversation) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === updatedConversation.id ? updatedConversation : c
+      ),
+      selectedConversation:
+        state.selectedConversation?.id === updatedConversation.id
+          ? updatedConversation
+          : state.selectedConversation,
+    }));
+  });
+
+  // New group created — add to sidebar
+  socket.on("groupCreated", (conversation: Conversation) => {
+    set((state) => {
+      const exists = state.conversations.find((c) => c.id === conversation.id);
+      if (exists) return state;
+      return { conversations: [conversation, ...state.conversations] };
     });
+  });
 
-    // Typing indicators
-    socket.on("userTyping", ({ userId }: { userId: string }) => {
-      set((state) => ({
-        typingUserIds: state.typingUserIds.includes(userId)
-          ? state.typingUserIds
-          : [...state.typingUserIds, userId],
-      }));
-    });
+  // Removed from group
+  socket.on("removedFromGroup", ({ conversationId }: { conversationId: string }) => {
+    set((state) => ({
+      conversations: state.conversations.filter((c) => c.id !== conversationId),
+      selectedConversation:
+        state.selectedConversation?.id === conversationId
+          ? null
+          : state.selectedConversation,
+    }));
+  });
+},
 
-    socket.on("userStopTyping", ({ userId }: { userId: string }) => {
-      set((state) => ({
-        typingUserIds: state.typingUserIds.filter((id) => id !== userId),
-      }));
-    });
-  },
+unsubscribeFromMessages: () => {
+  const socket = getSocket();
+  if (!socket) return;
 
-  unsubscribeFromMessages: () => {
-    const socket = getSocket();
-    if (!socket) return;
+  const { selectedConversation } = get();
+  if (selectedConversation) {
+    socket.emit("leaveConversation", selectedConversation.id);
+  }
 
-    const { selectedConversation } = get();
-    if (selectedConversation) {
-      socket.emit("leaveConversation", selectedConversation.id);
-    }
-
-    socket.off("newMessage");
-    socket.off("userTyping");
-    socket.off("userStopTyping");
-  },
+  socket.off("newMessage");
+  socket.off("userTyping");
+  socket.off("userStopTyping");
+  socket.off("groupUpdated");
+  socket.off("groupCreated");
+  socket.off("removedFromGroup");
+},
 }));

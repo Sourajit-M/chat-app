@@ -40,7 +40,7 @@ export const protectRoute = async (req: AuthRequest, res: Response, next: NextFu
 
     req.user = user;
     next();
-  }catch (error) {
+  }catch {
     res.status(401).json({ message: 'Unauthorized - invalid token' });
   }
 

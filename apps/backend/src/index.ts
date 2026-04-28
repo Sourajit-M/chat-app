@@ -10,6 +10,7 @@ import { prisma } from "./config/prisma";
 import authRoutes from "./auth/auth.routes"
 import conversationRoutes from "./conversations/conversations.routes";
 import messageRoutes from "./messages/messages.routes"
+import { initSocket } from "./socket/socket.server";
 
 const app = express();
 const httpServer = createServer(app);
@@ -30,7 +31,6 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-
 app.use("/api/auth", authRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
@@ -44,6 +44,9 @@ const start = async () => {
     await prisma.$connect();
     console.log("Database connected");
 
+    await initSocket(httpServer);
+    console.log("Socket initialized");
+
     httpServer.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
@@ -54,5 +57,3 @@ const start = async () => {
 };
 
 start();
-
-//httpServer is there because the Express app is only the request handler. Wrapping it with createServer(app) gives you the underlying Node HTTP server, which is needed if you want to attach socket.io, handle WebSockets, or manage server-level events like graceful shutdown later.

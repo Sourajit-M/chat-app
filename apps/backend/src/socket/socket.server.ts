@@ -28,6 +28,7 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
 
     if(userId){
       onlineUsers.set(userId, socket.id)
+      socket.join(userId)
       io.emit("getOnlineUsers", Array.from(onlineUsers.keys()))
       console.log(`User Connected: ${userId}`);
     }

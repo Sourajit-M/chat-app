@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { io } from "../socket/socket.server";
 
 const conversationInclude = {
   participants: {
@@ -28,36 +29,33 @@ const conversationInclude = {
       },
     },
   },
-}
+};
 
-// GET /api/conversations — get all conversations for logged in user
-export const getConversations = async (req: AuthRequest, res: Response): Promise<void> => {
-  try{
-    const userId = req.user!.id
-
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        participants: {
-          some: {userId},
-        },
-      },
-
-      include: conversationInclude,
-      orderBy: { updatedAt: "desc" }
-    })
-
-    res.status(200).json(conversations)
-  }catch(err){
-    console.error("getConversations error: ", err)
-    res.status(500).json({ message: 'Internal server error '})
-  }
-}
-
-// POST /api/conversations/dm/:userId — get or create a DM
-export const getOrCreateDM = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getConversations = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
-    const currentUserId = req.user!.id
-    const otherUserId = req.params.userId
+    const userId = req.user!.id;
+    const conversations = await prisma.conversation.findMany({
+      where: { participants: { some: { userId } } },
+      include: conversationInclude,
+      orderBy: { updatedAt: "desc" },
+    });
+    res.status(200).json(conversations);
+  } catch (error) {
+    console.error("getConversations error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getOrCreateDM = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user!.id;
+    const otherUserId = req.params.userId;
 
     if (currentUserId === otherUserId) {
       res.status(400).json({ message: "Cannot create DM with yourself" });
@@ -80,15 +78,11 @@ export const getOrCreateDM = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Create new DM conversation
     const conversation = await prisma.conversation.create({
       data: {
         isGroup: false,
         participants: {
-          create: [
-            { userId: currentUserId },
-            { userId: otherUserId },
-          ],
+          create: [{ userId: currentUserId }, { userId: otherUserId }],
         },
       },
       include: conversationInclude,
@@ -99,9 +93,8 @@ export const getOrCreateDM = async (req: AuthRequest, res: Response): Promise<vo
     console.error("getOrCreateDM error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-}
+};
 
-// POST /api/conversations/group — create group chat
 export const createGroup = async (
   req: AuthRequest,
   res: Response
@@ -120,7 +113,6 @@ export const createGroup = async (
       return;
     }
 
-    // Deduplicate and ensure current user is included
     const allMemberIds = [...new Set([currentUserId, ...memberIds])];
 
     const conversation = await prisma.conversation.create({
@@ -135,6 +127,11 @@ export const createGroup = async (
       include: conversationInclude,
     });
 
+    // Notify all members about the new group
+    allMemberIds.forEach((userId) => {
+      io.to(userId).emit("groupCreated", conversation);
+    });
+
     res.status(201).json(conversation);
   } catch (error) {
     console.error("createGroup error:", error);
@@ -142,7 +139,6 @@ export const createGroup = async (
   }
 };
 
-// PUT /api/conversations/group/:id — update group name/icon
 export const updateGroup = async (
   req: AuthRequest,
   res: Response
@@ -152,9 +148,7 @@ export const updateGroup = async (
     const { id } = req.params;
     const { name } = req.body;
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id },
-    });
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
 
     if (!conversation || !conversation.isGroup) {
       res.status(404).json({ message: "Group not found" });
@@ -172,6 +166,9 @@ export const updateGroup = async (
       include: conversationInclude,
     });
 
+    // Notify all members
+    io.to(id).emit("groupUpdated", updated);
+
     res.status(200).json(updated);
   } catch (error) {
     console.error("updateGroup error:", error);
@@ -179,7 +176,6 @@ export const updateGroup = async (
   }
 };
 
-// POST /api/conversations/group/:id/members — add member
 export const addGroupMember = async (
   req: AuthRequest,
   res: Response
@@ -204,7 +200,7 @@ export const addGroupMember = async (
       return;
     }
 
-    const alreadyMember = conversation.participants.some((p) => p.userId === userId);
+    const alreadyMember = conversation.participants.some((p: { userId: string }) => p.userId === userId);
     if (alreadyMember) {
       res.status(400).json({ message: "User is already a member" });
       return;
@@ -219,6 +215,10 @@ export const addGroupMember = async (
       include: conversationInclude,
     });
 
+    // Notify all members including the new one
+    io.to(id).emit("groupUpdated", updated);
+    io.to(userId).emit("groupCreated", updated);
+
     res.status(200).json(updated);
   } catch (error) {
     console.error("addGroupMember error:", error);
@@ -226,7 +226,6 @@ export const addGroupMember = async (
   }
 };
 
-// DELETE /api/conversations/group/:id/members/:userId — remove member
 export const removeGroupMember = async (
   req: AuthRequest,
   res: Response
@@ -235,9 +234,7 @@ export const removeGroupMember = async (
     const currentUserId = req.user!.id;
     const { id, userId } = req.params;
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id },
-    });
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
 
     if (!conversation || !conversation.isGroup) {
       res.status(404).json({ message: "Group not found" });
@@ -263,6 +260,11 @@ export const removeGroupMember = async (
       include: conversationInclude,
     });
 
+    // Notify remaining members
+    io.to(id).emit("groupUpdated", updated);
+    // Notify removed user
+    io.to(userId).emit("removedFromGroup", { conversationId: id });
+
     res.status(200).json(updated);
   } catch (error) {
     console.error("removeGroupMember error:", error);
@@ -270,14 +272,12 @@ export const removeGroupMember = async (
   }
 };
 
-// GET /api/conversations/users — get all users except self (for sidebar)
 export const getAllUsers = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
     const currentUserId = req.user!.id;
-
     const users = await prisma.user.findMany({
       where: { id: { not: currentUserId } },
       select: {
@@ -288,11 +288,9 @@ export const getAllUsers = async (
       },
       orderBy: { fullName: "asc" },
     });
-
     res.status(200).json(users);
   } catch (error) {
     console.error("getAllUsers error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
