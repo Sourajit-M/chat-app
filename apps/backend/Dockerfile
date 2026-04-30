@@ -1,30 +1,34 @@
 FROM node:20-alpine
 
-# Install pnpm
 RUN npm install -g pnpm
 
+# Set workdir to the monorepo root
 WORKDIR /app
 
-# Copy workspace config files
+# Copy workspace config
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 
-# Copy package.json files for dependency resolution
+# Copy package.json files
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install all dependencies
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy all source code
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
 
 # Generate Prisma client
 RUN cd apps/backend && npx prisma generate
 
-# Build TypeScript → outputs to apps/backend/dist/
+# Build TypeScript
 RUN cd apps/backend && pnpm build
 
-# ← This is the fix: correct path to compiled entry point
+# Verify the build output exists (helps debug if build fails silently)
+RUN ls -la apps/backend/dist/
+
+EXPOSE 5001
+
 CMD ["node", "apps/backend/dist/index.js"]
