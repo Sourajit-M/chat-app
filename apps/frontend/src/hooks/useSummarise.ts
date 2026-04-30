@@ -27,7 +27,14 @@ export const useSummarize = () => {
       );
       setResult(res.data);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to generate summary");
+      const status = err?.response?.status;
+      if (status === 503 || status === 429) {
+        setError(err.response?.data?.message || "The AI service is currently overloaded. Please try again in a few moments.");
+      } else if (err.request && !err.response) {
+        setError("Server unreachable. Please check your connection.");
+      } else {
+        setError(err.response?.data?.message || "Failed to generate summary");
+      }
     } finally {
       setIsLoading(false);
     }

@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ authUser: res.data });
       toast.success("Account created successfully!");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Signup failed");
+      toast.error(error.response?.data?.message || (error.request ? "Server unreachable. Please try again later." : "Signup failed"));
     } finally {
       set({ isSigningUp: false });
     }
@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ authUser: res.data });
       toast.success("Logged in successfully!");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Login failed");
+      toast.error(error.response?.data?.message || (error.request ? "Server unreachable. Please try again later." : "Login failed"));
     } finally {
       set({ isLoggingIn: false });
     }
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ authUser: null });
       toast.success("Logged out successfully!");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Logout failed");
+      toast.error(error.response?.data?.message || (error.request ? "Server unreachable. Please try again later." : "Logout failed"));
     }
   },
 
@@ -84,7 +84,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ authUser: res.data });
       toast.success("Profile updated!");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Update failed");
+      toast.error(error.response?.data?.message || (error.request ? "Server unreachable. Please try again later." : "Update failed"));
     } finally {
       set({ isUpdatingProfile: false });
     }
@@ -96,7 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ authUser: res.data });
       toast.success("Name updated successfully!");
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update name");
+      toast.error(error.response?.data?.message || (error.request ? "Server unreachable. Please try again later." : "Failed to update name"));
     }
   },
 }));

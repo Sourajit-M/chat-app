@@ -19,6 +19,8 @@ import { execSync } from "child_process";
 const app = express();
 const httpServer = createServer(app);
 
+app.set("trust proxy", 1);
+
 // ── Rate Limiters ──────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -52,6 +54,7 @@ app.use(cors({
     const allowed = [
       env.CLIENT_URL,
       "http://localhost:5173",
+      "https://chat-app-frontend-eta-two.vercel.app",
     ];
     if (!origin || allowed.includes(origin)) {
       callback(null, true);
@@ -71,10 +74,10 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.use("/api/auth", authLimiter,authRoutes);
-app.use("/api/conversations", globalLimiter,conversationRoutes);
-app.use("/api/messages", globalLimiter,messageRoutes);
-app.use("/api/ai", aiLimiter,aiRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/conversations", globalLimiter, conversationRoutes);
+app.use("/api/messages", globalLimiter, messageRoutes);
+app.use("/api/ai", aiLimiter, aiRoutes);
 
 app.use(errorHandler)
 
@@ -89,7 +92,6 @@ const start = async () => {
       execSync("npx prisma migrate deploy", { stdio: "inherit" });
       console.log("Migrations complete");
     }
-
 
     await prisma.$connect();
     console.log("Database connected");

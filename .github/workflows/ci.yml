@@ -45,12 +45,13 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: cd ../.. && pnpm install
@@ -61,7 +62,7 @@ jobs:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
 
       - name: Run migrations
-        run: npx prisma migrate deploy
+        run: pnpm exec prisma migrate deploy
         env:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
 
@@ -104,12 +105,13 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: cd ../.. && pnpm install

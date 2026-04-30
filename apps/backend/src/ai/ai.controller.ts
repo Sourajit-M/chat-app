@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth.middleware";
-import { geminiModel } from "../config/gemini";
+import { generateWithFallback } from "../config/gemini";
 
 export const summariseConversation = async(req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -90,8 +90,7 @@ export const summariseConversation = async(req: AuthRequest, res: Response): Pro
     Do not include any preamble — start directly with the summary.
     `.trim();
 
-    const result = await geminiModel.generateContent(prompt);
-    const summary = result.response.text();
+    const summary = await generateWithFallback(prompt);
 
     res.status(200).json({
       summary,
@@ -99,8 +98,15 @@ export const summariseConversation = async(req: AuthRequest, res: Response): Pro
       from: ordered[0].createdAt,
       to: ordered[ordered.length - 1].createdAt,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("summarise Conversation error:", error);
+    const status = error?.status ?? error?.statusCode;
+    if (status === 503 || status === 429) {
+      res.status(503).json({
+        message: "The AI service is currently overloaded. Please try again in a few moments."
+      });
+      return;
+    }
     res.status(500).json({ message: "Failed to generate summary" });
   }
 }
