@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import { useChatStore } from "../../store/useChatStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import {
   X, Edit2, Check, UserPlus, UserMinus,
-  Users, Crown, Search
+  Users, Crown, Search, Camera, Loader2
 } from "lucide-react";
 import type { Conversation } from "@chat-app/shared";
 
@@ -15,12 +15,13 @@ interface Props {
 
 const GroupInfoPanel = ({ conversation, onClose, onlineUserIds }: Props) => {
   const { authUser } = useAuthStore();
-  const { users, addGroupMember, removeGroupMember, updateGroup } = useChatStore();
+  const { users, addGroupMember, removeGroupMember, updateGroup, updateGroupIcon } = useChatStore();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(conversation.name || "");
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
+  const [isUpdatingIcon, setIsUpdatingIcon] = useState(false);
 
   const isAdmin = conversation.adminId === authUser?.id;
   const memberIds = conversation.participants.map((p) => p.user.id);
@@ -39,6 +40,22 @@ const GroupInfoPanel = ({ conversation, onClose, onlineUserIds }: Props) => {
     setIsEditingName(false);
   };
 
+  const handleIconUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) return;
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      const base64Image = reader.result as string;
+      setIsUpdatingIcon(true);
+      await updateGroupIcon(conversation.id, base64Image);
+      setIsUpdatingIcon(false);
+    };
+  };
+
   return (
     <div className="w-72 border-l border-base-300 bg-base-100 flex flex-col h-full overflow-y-auto">
 
@@ -55,9 +72,40 @@ const GroupInfoPanel = ({ conversation, onClose, onlineUserIds }: Props) => {
 
       {/* Group Name */}
       <div className="p-4 border-b border-base-300 space-y-3">
-        <div className="flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <Users className="w-8 h-8 text-primary" />
+        <div className="flex flex-col items-center justify-center gap-2">
+          <div className="relative">
+            {conversation.groupIcon ? (
+              <img
+                src={conversation.groupIcon}
+                alt={conversation.name || "Group"}
+                className="w-16 h-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users className="w-8 h-8 text-primary" />
+              </div>
+            )}
+            
+            {isAdmin && (
+              <label
+                htmlFor="group-icon-upload"
+                className={`absolute bottom-0 right-0 bg-base-content hover:scale-105 p-1 rounded-full cursor-pointer transition-all duration-200 shadow-sm ${isUpdatingIcon ? "animate-pulse pointer-events-none" : ""}`}
+              >
+                {isUpdatingIcon ? (
+                  <Loader2 className="w-3.5 h-3.5 text-base-100 animate-spin" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5 text-base-100" />
+                )}
+                <input
+                  type="file"
+                  id="group-icon-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleIconUpload}
+                  disabled={isUpdatingIcon}
+                />
+              </label>
+            )}
           </div>
         </div>
 

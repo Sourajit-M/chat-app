@@ -7,9 +7,10 @@ import { Users, Search, Plus, MessageSquare } from "lucide-react";
 
 interface Props {
   onlineUserIds: string[];
+  className?: string;
 }
 
-const Sidebar = ({ onlineUserIds }: Props) => {
+const Sidebar = ({ onlineUserIds, className = "" }: Props) => {
   const { conversations, users, getConversations, getUsers,
           getOrCreateDM, isLoadingConversations } = useChatStore();
   const { authUser } = useAuthStore();
@@ -36,7 +37,7 @@ const Sidebar = ({ onlineUserIds }: Props) => {
 
   return (
     <>
-      <aside className="h-full w-72 border-r border-base-300 flex flex-col bg-base-100">
+      <aside className={`h-full w-full md:w-72 border-r border-base-300 flex flex-col bg-base-100 ${className}`}>
 
         {/* Header */}
         <div className="p-4 border-b border-base-300 space-y-3">
@@ -92,21 +93,28 @@ const Sidebar = ({ onlineUserIds }: Props) => {
                 onChange={(e) => setUserSearch(e.target.value)}
               />
             </div>
-            <div className="max-h-40 overflow-y-auto space-y-1">
-              {filteredUsers.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => { getOrCreateDM(user.id); setShowUsers(false); }}
-                  className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-300 transition-colors text-left"
-                >
-                  <img
-                    src={user.profilePic || "/avatar.png"}
-                    alt={user.fullName}
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
-                  <span className="text-sm">{user.fullName}</span>
-                </button>
-              ))}
+            <div className="max-h-40 overflow-y-auto space-y-1 mt-2">
+              {filteredUsers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-4 text-base-content/50">
+                  <Users className="w-6 h-6 mb-2 opacity-40" />
+                  <p className="text-xs">No users found</p>
+                </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => { getOrCreateDM(user.id); setShowUsers(false); }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-300 transition-colors text-left"
+                  >
+                    <img
+                      src={user.profilePic || "/avatar.png"}
+                      alt={user.fullName}
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                    <span className="text-sm">{user.fullName}</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -125,10 +133,14 @@ const Sidebar = ({ onlineUserIds }: Props) => {
               </div>
             ))
           ) : filteredConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4 text-base-content/50">
-              <MessageSquare className="w-10 h-10 mb-2 opacity-30" />
-              <p className="text-sm">No conversations yet</p>
-              <p className="text-xs mt-1">Click + to start a DM</p>
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-base-200/50 rounded-2xl border border-base-200 border-dashed m-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                <MessageSquare className="w-6 h-6 text-primary" />
+              </div>
+              <p className="text-sm font-medium">No conversations yet</p>
+              <p className="text-xs text-base-content/60 mt-1 max-w-[200px]">
+                Click the + icon above to start a direct message with someone, or create a group.
+              </p>
             </div>
           ) : (
             filteredConversations.map((conversation) => (

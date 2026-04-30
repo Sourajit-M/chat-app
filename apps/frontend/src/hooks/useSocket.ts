@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
-import { connectSocket, disconnectSocket, getSocket } from "../lib/socket";
+import { connectSocket, disconnectSocket } from "../lib/socket";
 import { useAuthStore } from "../store/useAuthStore";
-import { useChatStore } from "../store/useChatStore";
-import type { Message } from "@chat-app/shared";
 
 export const useSocket = () => {
-  const { authUser } = useAuthStore();
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const { authUser, onlineUsers, setOnlineUsers } = useAuthStore();
 
   useEffect(() => {
     if (!authUser) {
@@ -17,13 +14,19 @@ export const useSocket = () => {
     const socket = connectSocket(authUser.id);
 
     socket.on("getOnlineUsers", (userIds: string[]) => {
-      setOnlineUserIds(userIds);
+      setOnlineUsers(userIds);
+    });
+
+    import("../store/useChatStore").then(({ useChatStore }) => {
+      const store = useChatStore.getState();
+      store.initSocketListeners();
+      store.conversations.forEach((c) => socket.emit("joinConversation", c.id));
     });
 
     return () => {
       socket.off("getOnlineUsers");
     };
-  }, [authUser]);
+  }, [authUser, setOnlineUsers]);
 
-  return { onlineUserIds };
+  return { onlineUserIds: onlineUsers };
 };

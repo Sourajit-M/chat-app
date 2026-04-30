@@ -10,17 +10,16 @@ import { Loader2, Users, X, Info, Sparkles } from "lucide-react";
 
 interface Props {
   onlineUserIds: string[];
+  className?: string;
 }
 
-const ChatContainer = ({ onlineUserIds }: Props) => {
+const ChatContainer = ({ onlineUserIds, className = "" }: Props) => {
   const {
     selectedConversation,
     messages,
     isLoadingMessages,
     typingUserIds,
     getMessages,
-    subscribeToMessages,
-    unsubscribeFromMessages,
     selectConversation,
   } = useChatStore();
 
@@ -28,6 +27,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
 
   const { name, avatar, isGroup, otherUser } =
     useConversationInfo(selectedConversation!);
@@ -38,14 +38,13 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
   useEffect(() => {
     if (!selectedConversation) return;
     getMessages(selectedConversation.id);
-    subscribeToMessages();
     setShowGroupInfo(false);
-    return () => unsubscribeFromMessages();
+    setReplyingTo(null);
   }, [selectedConversation?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typingUserIds]);
+  }, [messages, typingUserIds, replyingTo]);
 
   const typingUsers =
     selectedConversation?.participants
@@ -56,7 +55,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
       .map((p) => p.user.fullName) || [];
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className={`flex-1 flex overflow-hidden ${className}`}>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -143,7 +142,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
             </div>
           ) : (
             messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble key={message.id} message={message} setReplyingTo={setReplyingTo} />
             ))
           )}
 
@@ -167,7 +166,7 @@ const ChatContainer = ({ onlineUserIds }: Props) => {
         </div> {/* ← End of Messages */}
 
         {/* Input */}
-        <MessageInput />
+        <MessageInput replyingTo={replyingTo} setReplyingTo={setReplyingTo} />
 
       </div> {/* ← End of Main Chat Area */}
 

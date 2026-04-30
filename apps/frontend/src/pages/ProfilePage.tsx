@@ -82,9 +82,24 @@ const ProfilePage = () => {
                 <User className="w-4 h-4" />
                 Full Name
               </div>
-              <p className="px-4 py-2.5 bg-base-200 rounded-lg border border-base-300">
-                {authUser?.fullName}
-              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="input input-bordered w-full bg-base-200"
+                  defaultValue={authUser?.fullName}
+                  onBlur={(e) => {
+                    const newName = e.target.value.trim();
+                    if (newName && newName !== authUser?.fullName) {
+                      useAuthStore.getState().updateName(newName);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

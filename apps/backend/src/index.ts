@@ -12,17 +12,55 @@ import conversationRoutes from "./conversations/conversations.routes";
 import messageRoutes from "./messages/messages.routes"
 import { initSocket } from "./socket/socket.server";
 import aiRoutes from "./ai/ai.routes";
+import rateLimit from "express-rate-limit";
+import { errorHandler } from "./middleware/error.middleware";
 
 const app = express();
 const httpServer = createServer(app);
 
+// ── Rate Limiters ──────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: { message: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // stricter for auth routes
+  message: { message: "Too many auth attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // Gemini free tier is limited
+  message: { message: "AI summary limit reached, please wait a moment" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: env.CLIENT_URL,
+  origin: (origin, callback) => {
+    const allowed = [
+      env.CLIENT_URL,
+      "http://localhost:5173",
+    ];
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 }));
-app.use(express.json({ limit: "10mb" })); // 10mb for base64 images
+app.use(express.json({ limit: "50mb" })); // Increased limit for base64 media uploads
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
@@ -32,10 +70,12 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/conversations", conversationRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/ai", aiRoutes);
+app.use("/api/auth", authLimiter,authRoutes);
+app.use("/api/conversations", globalLimiter,conversationRoutes);
+app.use("/api/messages", globalLimiter,messageRoutes);
+app.use("/api/ai", aiLimiter,aiRoutes);
+
+app.use(errorHandler)
 
 // Start server
 const PORT = parseInt(env.PORT);

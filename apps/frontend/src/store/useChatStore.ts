@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import { getSocket } from "../lib/socket";
+import { useAuthStore } from "./useAuthStore";
 import toast from "react-hot-toast";
 import type { Conversation, Message } from "@chat-app/shared";
 
@@ -29,10 +30,11 @@ interface ChatState {
   addGroupMember: (conversationId: string, userId: string) => Promise<void>;
   removeGroupMember: (conversationId: string, userId: string) => Promise<void>;
   updateGroup: (conversationId: string, name: string) => Promise<void>;
+  updateGroupIcon: (conversationId: string, groupIcon: string) => Promise<void>;
   getMessages: (conversationId: string) => Promise<void>;
-  sendMessage: (conversationId: string, data: { text?: string; image?: string }) => Promise<void>;
-  subscribeToMessages: () => void;
-  unsubscribeFromMessages: () => void;
+  sendMessage: (conversationId: string, data: { text?: string; image?: string; video?: string; replyToId?: string }) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  initSocketListeners: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -50,6 +52,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const res = await axiosInstance.get("/conversations");
       set({ conversations: res.data });
+      
+      // Join all conversation rooms so we receive background events (new messages, reads, etc)
+      const socket = getSocket();
+      if (socket) {
+        res.data.forEach((c: any) => socket.emit("joinConversation", c.id));
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to load conversations");
     } finally {
@@ -70,7 +78,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectConversation: (conversation) => {
-    set({ selectedConversation: conversation, messages: [], typingUserIds: [] });
+    set((state) => ({
+      selectedConversation: conversation,
+      messages: [],
+      typingUserIds: [],
+      conversations: state.conversations.map((c) =>
+        c.id === conversation.id ? { ...c, unreadCount: 0 } : c
+      ),
+    }));
   },
 
   getOrCreateDM: async (userId) => {
@@ -81,7 +96,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!exists) {
         set((state) => ({ conversations: [conversation, ...state.conversations] }));
       }
-      set({ selectedConversation: conversation, messages: [], typingUserIds: [] });
+      
+      const socket = getSocket();
+      if (socket) socket.emit("joinConversation", conversation.id);
+
+      set((state) => ({
+        selectedConversation: conversation,
+        messages: [],
+        typingUserIds: [],
+        conversations: state.conversations.map((c) =>
+          c.id === conversation.id ? { ...c, unreadCount: 0 } : c
+        ),
+      }));
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to open DM");
     }
@@ -90,6 +116,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createGroup: async (data) => {
     try {
       const res = await axiosInstance.post("/conversations/group", data);
+      
+      const socket = getSocket();
+      if (socket) socket.emit("joinConversation", res.data.id);
+
       set((state) => {
         const exists = state.conversations.find((c) => c.id === res.data.id);
         return {
@@ -166,6 +196,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  updateGroupIcon: async (conversationId, groupIcon) => {
+    try {
+      const res = await axiosInstance.put(
+        `/conversations/group/${conversationId}/icon`,
+        { groupIcon }
+      );
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conversationId ? res.data : c
+        ),
+        selectedConversation:
+          state.selectedConversation?.id === conversationId
+            ? res.data
+            : state.selectedConversation,
+      }));
+      toast.success("Group icon updated!");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update group icon");
+    }
+  },
+
   getMessages: async (conversationId) => {
     set({ isLoadingMessages: true });
     try {
@@ -180,38 +231,114 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (conversationId, data) => {
     try {
-      await axiosInstance.post(`/messages/${conversationId}`, data);
-      // No need to push to messages here — socket event handles it
+      const res = await axiosInstance.post(`/messages/${conversationId}`, data);
+      
+      set((state) => {
+        // Optimistically add to messages if we are still in this conversation
+        const isSelected = state.selectedConversation?.id === conversationId;
+        const newMessages = isSelected 
+          ? (state.messages.some(m => m.id === res.data.id) ? state.messages : [...state.messages, res.data])
+          : state.messages;
+
+        // Optimistically update the sidebar conversation
+        const newConversations = state.conversations
+          .map((c) =>
+            c.id === conversationId
+              ? { ...c, messages: [res.data], updatedAt: res.data.createdAt }
+              : c
+          )
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+        return {
+          messages: newMessages,
+          conversations: newConversations,
+        };
+      });
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to send message");
     }
   },
 
-  subscribeToMessages: () => {
-  const socket = getSocket();
-  if (!socket) return;
+  deleteMessage: async (messageId) => {
+    try {
+      await axiosInstance.delete(`/messages/${messageId}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to delete message");
+    }
+  },
 
-  const { selectedConversation } = get();
-  if (!selectedConversation) return;
+  initSocketListeners: () => {
+    const socket = getSocket();
+    if (!socket) return;
 
-  socket.emit("joinConversation", selectedConversation.id);
+    // Check if listeners are already attached to prevent duplicates
+    if (socket.listeners("newMessage").length > 0) return;
 
-  socket.on("newMessage", (message: Message) => {
-    if (message.conversationId !== get().selectedConversation?.id) return;
-    set((state) => ({ messages: [...state.messages, message] }));
-    set((state) => ({
-      conversations: state.conversations
-        .map((c) =>
-          c.id === message.conversationId
-            ? { ...c, messages: [message], updatedAt: message.createdAt }
-            : c
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    socket.on("newMessage", (message: Message) => {
+      const isSelected = message.conversationId === get().selectedConversation?.id;
+
+      if (isSelected) {
+        set((state) => ({ 
+          messages: state.messages.some(m => m.id === message.id) 
+            ? state.messages 
+            : [...state.messages, message] 
+        }));
+      }
+
+      const exists = get().conversations.find((c) => c.id === message.conversationId);
+      if (!exists) {
+        // Unknown conversation (e.g. new DM), fetch conversations to update sidebar
+        get().getConversations();
+      }
+
+      const { authUser } = useAuthStore.getState();
+      const isFromOther = authUser && message.senderId !== authUser.id;
+
+      set((state) => ({
+        conversations: state.conversations
+          .map((c) =>
+            c.id === message.conversationId
+              ? { 
+                  ...c, 
+                  messages: [message], 
+                  updatedAt: message.createdAt,
+                  unreadCount: isSelected ? 0 : (isFromOther ? (c.unreadCount || 0) + 1 : c.unreadCount)
+                }
+              : c
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          ),
+      }));
+
+      // Immediately mark as read since we are actively in this conversation
+      if (isSelected && isFromOther) {
+        socket.emit("messageRead", { conversationId: message.conversationId, userId: authUser.id });
+      }
+    });
+
+    socket.on("messageDeleted", (deletedMessage: Message) => {
+      set((state) => ({
+        messages: state.messages.map((m) =>
+          m.id === deletedMessage.id ? deletedMessage : m
         ),
-    }));
-  });
+        conversations: state.conversations.map((c) => {
+          if (c.id === deletedMessage.conversationId && c.messages?.[0]?.id === deletedMessage.id) {
+            return { ...c, messages: [deletedMessage] };
+          }
+          return c;
+        }),
+      }));
+    });
+
+    socket.on("messagesRead", ({ conversationId }: { conversationId: string }) => {
+      if (get().selectedConversation?.id === conversationId) {
+        set((state) => ({
+          messages: state.messages.map((m) => ({ ...m, isRead: true })),
+        }));
+      }
+    });
 
   socket.on("userTyping", ({ userId }: { userId: string }) => {
     set((state) => ({
@@ -261,20 +388,4 @@ export const useChatStore = create<ChatState>((set, get) => ({
   });
 },
 
-unsubscribeFromMessages: () => {
-  const socket = getSocket();
-  if (!socket) return;
-
-  const { selectedConversation } = get();
-  if (selectedConversation) {
-    socket.emit("leaveConversation", selectedConversation.id);
-  }
-
-  socket.off("newMessage");
-  socket.off("userTyping");
-  socket.off("userStopTyping");
-  socket.off("groupUpdated");
-  socket.off("groupCreated");
-  socket.off("removedFromGroup");
-},
 }));

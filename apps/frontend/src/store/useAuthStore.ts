@@ -5,24 +5,30 @@ import type { User } from "@chat-app/shared";
 
 interface AuthState {
   authUser: User | null;
+  onlineUsers: string[];
   isSigningUp: boolean;
   isLoggingIn: boolean;
   isUpdatingProfile: boolean;
   isCheckingAuth: boolean;
 
+  setOnlineUsers: (userIds: string[]) => void;
   checkAuth: () => Promise<void>;
   signup: (data: { fullName: string; email: string; password: string }) => Promise<void>;
   login: (data: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: { profilePic: string }) => Promise<void>;
+  updateName: (fullName: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   authUser: null,
+  onlineUsers: [],
   isSigningUp: false,
   isLoggingIn: false,
   isUpdatingProfile: false,
   isCheckingAuth: true,
+
+  setOnlineUsers: (userIds) => set({ onlineUsers: userIds }),
 
   checkAuth: async () => {
     try {
@@ -81,6 +87,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       toast.error(error.response?.data?.message || "Update failed");
     } finally {
       set({ isUpdatingProfile: false });
+    }
+  },
+
+  updateName: async (fullName: string) => {
+    try {
+      const res = await axiosInstance.put("/auth/profile/name", { fullName });
+      set({ authUser: res.data });
+      toast.success("Name updated successfully!");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update name");
     }
   },
 }));

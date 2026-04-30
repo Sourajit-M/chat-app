@@ -135,3 +135,33 @@ export const checkAuth = async (req: AuthRequest, res: Response): Promise<void> 
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const updateName = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { fullName } = req.body;
+    const userId = req.user!.id;
+
+    if (!fullName || typeof fullName !== "string" || fullName.trim().length === 0) {
+      res.status(400).json({ message: "Valid full name is required" });
+      return;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { fullName: fullName.trim() },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        profilePic: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error("Update name error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

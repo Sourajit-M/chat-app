@@ -20,4 +20,5 @@ export interface Conversation {
   }[];
   messages: Message[];
   lastMessage: Message | null;
+  unreadCount?: number;
 }

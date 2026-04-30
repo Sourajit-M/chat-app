@@ -2,35 +2,48 @@ import { useState, useRef, ChangeEvent } from "react";
 import { useChatStore } from "../../store/useChatStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { getSocket } from "../../lib/socket";
-import { Image, Send, X } from "lucide-react";
+import { Image, Video, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 
-const MessageInput = () => {
+interface Props {
+  replyingTo?: any;
+  setReplyingTo?: (message: any) => void;
+}
+
+const MessageInput = ({ replyingTo, setReplyingTo }: Props) => {
   const { selectedConversation, sendMessage } = useChatStore();
   const { authUser } = useAuthStore();
 
   const [text, setText] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<{ url: string; type: "image" | "video" } | null>(null);
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleMediaChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+
+    if (!isImage && !isVideo) {
+      toast.error("Please select an image or video file");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (isImage && file.size > 5 * 1024 * 1024) {
       toast.error("Image must be less than 5MB");
       return;
     }
 
+    if (isVideo && file.size > 20 * 1024 * 1024) {
+      toast.error("Video must be less than 20MB");
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result as string);
+    reader.onload = () => setMediaPreview({ url: reader.result as string, type: isImage ? "image" : "video" });
     reader.readAsDataURL(file);
   };
 
@@ -57,7 +70,7 @@ const MessageInput = () => {
 
   const handleSend = async () => {
     if (!selectedConversation) return;
-    if (!text.trim() && !imagePreview) return;
+    if (!text.trim() && !mediaPreview) return;
     if (isSending) return;
 
     setIsSending(true);
@@ -73,11 +86,14 @@ const MessageInput = () => {
 
     await sendMessage(selectedConversation.id, {
       text: text.trim() || undefined,
-      image: imagePreview || undefined,
+      image: mediaPreview?.type === "image" ? mediaPreview.url : undefined,
+      video: mediaPreview?.type === "video" ? mediaPreview.url : undefined,
+      replyToId: replyingTo?.id || undefined,
     });
 
     setText("");
-    setImagePreview(null);
+    setMediaPreview(null);
+    if (setReplyingTo) setReplyingTo(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setIsSending(false);
   };
@@ -90,19 +106,47 @@ const MessageInput = () => {
   };
 
   return (
-    <div className="p-4 border-t border-base-300 bg-base-100">
+    <div className="p-4 border-t border-base-300 bg-base-100 flex flex-col gap-2">
 
-      {/* Image Preview */}
-      {imagePreview && (
-        <div className="mb-3 relative w-fit">
-          <img
-            src={imagePreview}
-            alt="preview"
-            className="h-24 w-24 object-cover rounded-xl border border-base-300"
-          />
+      {/* Replying To Preview */}
+      {replyingTo && (
+        <div className="bg-base-200 rounded-lg p-3 border-l-4 border-primary flex items-start justify-between">
+          <div className="flex flex-col gap-0.5 overflow-hidden">
+            <span className="text-xs font-semibold text-primary">
+              Replying to {replyingTo.sender?.fullName || "User"}
+            </span>
+            <span className="text-xs text-base-content/70 truncate">
+              {replyingTo.image ? "📸 Photo" : replyingTo.text}
+            </span>
+          </div>
+          <button 
+            onClick={() => setReplyingTo?.(null)}
+            className="btn btn-ghost btn-xs btn-circle shrink-0 text-base-content/50 hover:bg-base-300 hover:text-base-content"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Media Preview */}
+      {mediaPreview && (
+        <div className="mb-1 relative w-fit">
+          {mediaPreview.type === "image" ? (
+            <img
+              src={mediaPreview.url}
+              alt="preview"
+              className="h-24 w-24 object-cover rounded-xl border border-base-300"
+            />
+          ) : (
+            <video
+              src={mediaPreview.url}
+              className="h-24 w-24 object-cover rounded-xl border border-base-300"
+              controls
+            />
+          )}
           <button
             onClick={() => {
-              setImagePreview(null);
+              setMediaPreview(null);
               if (fileInputRef.current) fileInputRef.current.value = "";
             }}
             className="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error"
@@ -115,20 +159,22 @@ const MessageInput = () => {
       {/* Input Row */}
       <div className="flex items-end gap-2">
 
-        {/* Image Upload */}
+        {/* Media Upload */}
         <button
           onClick={() => fileInputRef.current?.click()}
           className="btn btn-ghost btn-sm btn-circle shrink-0"
           type="button"
+          title="Upload image or video"
         >
           <Image className="w-5 h-5" />
         </button>
+
         <input
           type="file"
-          ref={fileInputRef}
-          accept="image/*"
+          accept="image/*,video/*"
           className="hidden"
-          onChange={handleImageChange}
+          ref={fileInputRef}
+          onChange={handleMediaChange}
         />
 
         {/* Text Input */}
@@ -144,7 +190,7 @@ const MessageInput = () => {
         {/* Send Button */}
         <button
           onClick={handleSend}
-          disabled={isSending || (!text.trim() && !imagePreview)}
+          disabled={isSending || (!text.trim() && !mediaPreview)}
           className="btn btn-primary btn-sm btn-circle shrink-0"
           type="button"
         >

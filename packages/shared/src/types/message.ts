@@ -4,7 +4,10 @@ export interface Message {
   senderId: string;
   text: string | null;
   image: string | null;
+  video?: string | null;
   isRead: boolean;
+  isDeleted?: boolean;
+  replyToId?: string | null;
   createdAt: string;
   updatedAt: string;
   sender?: {
@@ -12,6 +15,15 @@ export interface Message {
     fullName: string;
     profilePic: string | null;
   };
+  replyTo?: {
+    id: string;
+    text: string | null;
+    image: string | null;
+    video?: string | null;
+    sender: {
+      fullName: string;
+    }
+  } | null;
   reactions? : Reaction[];
 }
 

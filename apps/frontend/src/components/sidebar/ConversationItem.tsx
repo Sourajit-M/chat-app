@@ -19,7 +19,9 @@ const ConversationItem = ({ conversation, onlineUserIds }: Props) => {
 
   const lastMessage = conversation.messages?.[0];
   const lastMessageText = lastMessage
-    ? lastMessage.image && !lastMessage.text
+    ? lastMessage.video && !lastMessage.text
+      ? "🎥 Video"
+      : lastMessage.image && !lastMessage.text
       ? "📷 Image"
       : lastMessage.text || ""
     : "No messages yet";
@@ -65,9 +67,16 @@ const ConversationItem = ({ conversation, onlineUserIds }: Props) => {
             </span>
           )}
         </div>
-        <p className="text-xs text-base-content/60 truncate mt-0.5">
-          {isSentByMe ? "You: " : ""}{lastMessageText}
-        </p>
+        <div className="flex items-center justify-between mt-0.5">
+          <p className={`text-xs truncate ${conversation.unreadCount ? "text-base-content font-semibold" : "text-base-content/60"}`}>
+            {isSentByMe ? "You: " : ""}{lastMessageText}
+          </p>
+          {!!conversation.unreadCount && conversation.unreadCount > 0 && (
+            <span className="shrink-0 ml-2 bg-success text-success-content text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+              {conversation.unreadCount}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );

@@ -11,10 +11,17 @@ export let io: Server;
 export const initSocket = async( httpServer: HttpServer): Promise<void> => {
   io = new Server(httpServer, {
     cors: {
-      origin: env.CLIENT_URL,
+      origin: (origin, callback) => {
+        const allowed = [env.CLIENT_URL, "http://localhost:5173"];
+        if (!origin || allowed.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error("Not allowed"));
+        }
+      },
       credentials: true,
     },
-  })
+  });
 
   const pubClient = createClient({url: env.REDIS_URL})
   const subClient = pubClient.duplicate()
@@ -59,11 +66,25 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
     });
 
     // Mark messages as read
-    socket.on("messageRead", ({ conversationId, userId: readerId }: {
+    socket.on("messageRead", async ({ conversationId, userId: readerId }: {
       conversationId: string;
       userId: string;
     }) => {
-      socket.to(conversationId).emit("messagesRead", { readerId });
+      // Import prisma dynamically or at the top of the file
+      const { prisma } = require("../config/prisma");
+      try {
+        await prisma.message.updateMany({
+          where: {
+            conversationId,
+            senderId: { not: readerId },
+            isRead: false,
+          },
+          data: { isRead: true },
+        });
+        socket.to(conversationId).emit("messagesRead", { conversationId });
+      } catch (error) {
+        console.error("Error marking messages as read via socket:", error);
+      }
     });
 
     // Disconnect

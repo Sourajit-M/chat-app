@@ -42,7 +42,25 @@ export const getConversations = async (
       include: conversationInclude,
       orderBy: { updatedAt: "desc" },
     });
-    res.status(200).json(conversations);
+
+    const unreadCounts = await prisma.message.groupBy({
+      by: ['conversationId'],
+      where: {
+        conversationId: { in: conversations.map(c => c.id) },
+        isRead: false,
+        senderId: { not: userId },
+      },
+      _count: { id: true },
+    });
+
+    const unreadMap = new Map(unreadCounts.map(u => [u.conversationId, u._count.id]));
+
+    const response = conversations.map(c => ({
+      ...c,
+      unreadCount: unreadMap.get(c.id) || 0,
+    }));
+
+    res.status(200).json(response);
   } catch (error) {
     console.error("getConversations error:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -172,6 +190,54 @@ export const updateGroup = async (
     res.status(200).json(updated);
   } catch (error) {
     console.error("updateGroup error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateGroupIcon = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user!.id;
+    const { id } = req.params;
+    const { groupIcon } = req.body;
+
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
+
+    if (!conversation || !conversation.isGroup) {
+      res.status(404).json({ message: "Group not found" });
+      return;
+    }
+
+    if (conversation.adminId !== currentUserId) {
+      res.status(403).json({ message: "Only the group admin can update the group icon" });
+      return;
+    }
+
+    if (!groupIcon) {
+      res.status(400).json({ message: "Group icon is required" });
+      return;
+    }
+
+    // Since we don't import cloudinary here yet, we need to import it at the top
+    // Wait, the file doesn't have cloudinary. Let me add it.
+    const uploadResult = await require("../config/cloudinary").cloudinary.uploader.upload(groupIcon, {
+      folder: "chat-app/groups",
+    });
+
+    const updated = await prisma.conversation.update({
+      where: { id },
+      data: { groupIcon: uploadResult.secure_url },
+      include: conversationInclude,
+    });
+
+    // Notify all members
+    io.to(id).emit("groupUpdated", updated);
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error("updateGroupIcon error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
