@@ -12,7 +12,11 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
   io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        const allowed = [env.CLIENT_URL, "http://localhost:5173"];
+        const allowed = [
+          env.CLIENT_URL,
+          "http://localhost:5173",
+          "https://chat-app-frontend-eta-two.vercel.app",
+        ];
         if (!origin || allowed.includes(origin)) {
           callback(null, true);
         } else {
