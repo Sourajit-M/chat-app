@@ -14,6 +14,7 @@ import { initSocket } from "./socket/socket.server";
 import aiRoutes from "./ai/ai.routes";
 import rateLimit from "express-rate-limit";
 import { errorHandler } from "./middleware/error.middleware";
+import { execSync } from "child_process";
 
 const app = express();
 const httpServer = createServer(app);
@@ -82,6 +83,14 @@ const PORT = parseInt(env.PORT);
 
 const start = async () => {
   try {
+    // Auto-run migrations on startup
+    if (env.NODE_ENV === "production") {
+      console.log("Running database migrations...");
+      execSync("npx prisma migrate deploy", { stdio: "inherit" });
+      console.log("Migrations complete");
+    }
+
+
     await prisma.$connect();
     console.log("Database connected");
 
