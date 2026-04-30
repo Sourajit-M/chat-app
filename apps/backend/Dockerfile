@@ -5,29 +5,26 @@ RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Copy workspace files
+# Copy workspace config files
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 
-# Copy package files for all packages
+# Copy package.json files for dependency resolution
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source files
+# Copy source code
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
 
 # Generate Prisma client
 RUN cd apps/backend && npx prisma generate
 
-# Build TypeScript
+# Build TypeScript → outputs to apps/backend/dist/
 RUN cd apps/backend && pnpm build
 
-WORKDIR /app/apps/backend
-
-EXPOSE 5001
-
-CMD ["node", "dist/index.js"]
+# ← This is the fix: correct path to compiled entry point
+CMD ["node", "apps/backend/dist/index.js"]
