@@ -2,33 +2,33 @@ FROM node:20-alpine
 
 RUN npm install -g pnpm
 
-# Set workdir to the monorepo root
 WORKDIR /app
 
 # Copy workspace config
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 
-# Copy package.json files
+# Copy package.json files for all workspaces
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy all source code
+# Copy source code
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
 
 # Generate Prisma client
 RUN cd apps/backend && npx prisma generate
 
-# Build TypeScript
-RUN cd apps/backend && pnpm build
+# Build TypeScript — run from backend dir so tsconfig.json is found
+WORKDIR /app/apps/backend
+RUN pnpm build
 
-# Verify the build output exists (helps debug if build fails silently)
-RUN ls -la apps/backend/dist/
+# Verify dist was created — this will fail the build loudly if dist is missing
+RUN ls -la dist/ && ls -la dist/index.js
 
 EXPOSE 5001
 
-CMD ["node", "apps/backend/dist/index.js"]
+CMD ["node", "dist/index.js"]
