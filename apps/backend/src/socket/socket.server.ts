@@ -4,7 +4,7 @@ import { createClient } from "redis";
 import { Server as HttpServer } from "http";
 import { env } from "../config/env";
 
-const onlineUsers = new Map<string, string>();
+const onlineUsers = new Map<string, Set<string>>();
 
 export let io: Server;
 
@@ -38,23 +38,25 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
     const userId = socket.handshake.query.userId as string;
 
     if(userId){
-      onlineUsers.set(userId, socket.id)
-      socket.join(userId)
-      io.emit("getOnlineUsers", Array.from(onlineUsers.keys()))
-      console.log(`User Connected: ${userId}`);
+      if (!onlineUsers.has(userId)) {
+        onlineUsers.set(userId, new Set());
+      }
+      onlineUsers.get(userId)!.add(socket.id);
+      
+      socket.join(userId);
+      io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
+      console.log(`User Connected: ${userId} (Total connections: ${onlineUsers.get(userId)!.size})`);
     }
 
-    // Join a conversation room
+    // ... existing listeners ...
     socket.on("joinConversation", (conversationId: string) => {
       socket.join(conversationId);
     });
 
-    // Leave a conversation room
     socket.on("leaveConversation", (conversationId: string) => {
       socket.leave(conversationId);
     });
 
-    // Typing indicators
     socket.on("typing", ({ conversationId, userId: typingUserId }: {
       conversationId: string;
       userId: string;
@@ -69,12 +71,10 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
       socket.to(conversationId).emit("userStopTyping", { userId: typingUserId });
     });
 
-    // Mark messages as read
     socket.on("messageRead", async ({ conversationId, userId: readerId }: {
       conversationId: string;
       userId: string;
     }) => {
-      // Import prisma dynamically or at the top of the file
       const { prisma } = require("../config/prisma");
       try {
         await prisma.message.updateMany({
@@ -91,10 +91,15 @@ export const initSocket = async( httpServer: HttpServer): Promise<void> => {
       }
     });
 
-    // Disconnect
     socket.on("disconnect", () => {
       if (userId) {
-        onlineUsers.delete(userId);
+        const userConnections = onlineUsers.get(userId);
+        if (userConnections) {
+          userConnections.delete(socket.id);
+          if (userConnections.size === 0) {
+            onlineUsers.delete(userId);
+          }
+        }
         io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
         console.log(`User disconnected: ${userId}`);
       }
