@@ -2,7 +2,7 @@ import { useState, useRef, ChangeEvent } from "react";
 import { useChatStore } from "../../store/useChatStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { getSocket } from "../../lib/socket";
-import { Image, Video, Send, X } from "lucide-react";
+import { Image, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Props {

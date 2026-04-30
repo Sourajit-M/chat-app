@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { connectSocket, disconnectSocket } from "../lib/socket";
 import { useAuthStore } from "../store/useAuthStore";
 
