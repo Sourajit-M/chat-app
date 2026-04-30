@@ -36,38 +36,37 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    defaults:
-      run:
-        working-directory: apps/backend
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 10
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: cd ../.. && pnpm install
+        run: pnpm install
+        working-directory: .
 
       - name: Generate Prisma client
-        run: pnpm db:generate
+        run: pnpm exec prisma generate
+        working-directory: apps/backend
         env:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
 
       - name: Run migrations
         run: pnpm exec prisma migrate deploy
+        working-directory: apps/backend
         env:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
 
       - name: Typecheck
         run: pnpm typecheck
+        working-directory: apps/backend
         env:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
           TEST_DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
@@ -81,6 +80,7 @@ jobs:
 
       - name: Run tests
         run: pnpm test
+        working-directory: apps/backend
         env:
           DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
           TEST_DATABASE_URL: postgresql://chatuser:chatpassword@localhost:5432/chatdb_test
@@ -96,25 +96,22 @@ jobs:
     name: Frontend — Typecheck
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: apps/frontend
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 10
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: cd ../.. && pnpm install
+        run: pnpm install
+        working-directory: .
 
       - name: Typecheck
         run: pnpm typecheck
+        working-directory: apps/frontend
